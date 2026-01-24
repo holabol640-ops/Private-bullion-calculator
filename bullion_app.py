@@ -1,33 +1,19 @@
 import streamlit as st
-import requests
 
-@st.cache_data(ttl=300)  # 5-minute cache
-def get_live_spot_prices():
-    try:
-        url = "https://api.metals.live/v1/spot"
-        r = requests.get(url, timeout=10)
-        r.raise_for_status()
-        data = r.json()
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(
+    page_title="Private Bullion Calculator (UK)",
+    page_icon="🪙",
+    layout="centered"
+)
 
-        # data format: [["gold", price], ["silver", price]]
-        prices = {item[0]: item[1] for item in data}
-
-        gold = prices.get("gold")
-        silver = prices.get("silver")
-
-        return gold, silver
-    except Exception as e:
-        st.error(f"Live spot error: {e}")
-        return None, None
-        
-# -------- PASSWORD PROTECTION (USING SECRETS) --------
+# ---------------- PASSWORD PROTECTION ----------------
 def check_password():
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
 
     if not st.session_state.authenticated:
         pwd = st.text_input("Password", type="password")
-
         if pwd and pwd == st.secrets["APP_PASSWORD"]:
             st.session_state.authenticated = True
             st.rerun()
@@ -36,21 +22,22 @@ def check_password():
 
 check_password()
 
-# ---------------- CONFIG ----------------
-st.set_page_config(
-    page_title="Private Bullion Calculator (UK)",
-    page_icon="🪙",
-    layout="centered"
-)
-
-st.title("🪙 Private Bullion Calculator (UK)")
-st.caption("Gold & Silver • bars & coins • UK VAT rules")
-
+# ---------------- CONSTANTS ----------------
 TROY_OZ_IN_G = 31.1035
 
 # ---------------- SESSION DEFAULTS ----------------
+if "spot_gold" not in st.session_state:
+    st.session_state.spot_gold = 0.0
+
+if "spot_silver" not in st.session_state:
+    st.session_state.spot_silver = 0.0
+
 if "premium_pct" not in st.session_state:
     st.session_state.premium_pct = 5.0
+
+# ---------------- HEADER ----------------
+st.title("🪙 Private Bullion Calculator (UK)")
+st.caption("Gold & Silver • Bars & Coins • UK VAT rules")
 
 # ---------------- PRODUCT TYPE ----------------
 product_type = st.selectbox(
@@ -83,35 +70,41 @@ else:
         )
     else:
         weight_g = st.selectbox(
-            "Weight",
-            [1, 2, 5, 10, 20, 50, 100]  # kg
+            "Weight (kg)",
+            [1, 2, 5, 10, 20, 50, 100]
         ) * 1000
 
     weight_oz = weight_g / TROY_OZ_IN_G
     weight_label = f"{weight_g / 1000:.3f} kg" if weight_g >= 1000 else f"{weight_g} g"
 
-# ---------------- INPUTS (SMOOTH) ----------------
-# ---------------- SPOT PRICE ----------------
-
+# ---------------- SPOT PRICE (MANUAL / SAVED) ----------------
 st.subheader("Spot price")
 
-use_live = st.checkbox("Use live spot price", value=True)
+spot_value = st.number_input(
+    "Spot price (£ per oz)",
+    min_value=0.0,
+    step=0.01,
+    value=(
+        st.session_state.spot_gold
+        if metal == "Gold"
+        else st.session_state.spot_silver
+    ),
+    format="%.2f"
+)
 
-gold_spot, silver_spot = get_live_spot_prices()
+col1, col2 = st.columns(2)
 
-live_spot = gold_spot if metal == "Gold" else silver_spot
+if col1.button("Save Gold spot"):
+    st.session_state.spot_gold = spot_value
+    st.success("Gold spot saved")
 
-if use_live and live_spot:
-    spot_per_oz = float(live_spot)
-    st.success(f"Live {metal} spot: £{spot_per_oz:,.2f} per oz")
-else:
-    spot_per_oz = st.number_input(
-        "Spot price (£ per oz)",
-        min_value=0.0,
-        step=0.01,
-        format="%.2f"
-    )
+if col2.button("Save Silver spot"):
+    st.session_state.spot_silver = spot_value
+    st.success("Silver spot saved")
 
+st.caption("Source: Kitco / LBMA (manual reference)")
+
+# ---------------- PREMIUM ----------------
 premium_pct = st.slider(
     "Premium (%)",
     min_value=0.0,
@@ -123,14 +116,15 @@ premium_pct = st.slider(
 st.session_state.premium_pct = premium_pct
 
 # ---------------- CALCULATIONS ----------------
-try:
-    spot_per_oz = float(spot_per_oz)
-except ValueError:
-    spot_per_oz = 0.0
+spot_per_oz = (
+    st.session_state.spot_gold
+    if metal == "Gold"
+    else st.session_state.spot_silver
+)
 
-spot_value = spot_per_oz * weight_oz
-premium_value = spot_value * (premium_pct / 100)
-subtotal = spot_value + premium_value
+spot_total = spot_per_oz * weight_oz
+premium_value = spot_total * (premium_pct / 100)
+subtotal = spot_total + premium_value
 
 vat_rate = 0.20 if metal == "Silver" else 0.0
 vat_value = subtotal * vat_rate
@@ -143,12 +137,11 @@ st.write(f"**Metal:** {metal}")
 st.write(f"**Product:** {product_type}")
 st.write(f"**Weight:** {weight_label} ({weight_oz:.4f} oz)")
 
-st.metric("Spot value", f"£{spot_value:,.2f}")
+st.metric("Spot value", f"£{spot_total:,.2f}")
 st.metric("Premium", f"£{premium_value:,.2f}")
 
 if metal == "Silver":
     st.metric("VAT (20%)", f"£{vat_value:,.2f}")
-
 
 st.metric("Final Retail Price", f"£{final_price:,.2f}")
 
