@@ -1,5 +1,21 @@
 import streamlit as st
 
+# -------- PASSWORD PROTECTION --------
+PASSWORD = "153lol"  # CHANGE THIS
+
+def check_password():
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if not st.session_state.authenticated:
+        pwd = st.text_input("Password", type="password")
+        if pwd == PASSWORD:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.stop()
+
+check_password()
 # ---------------- CONFIG ----------------
 st.set_page_config(
     page_title="Private Bullion Calculator (UK)",
@@ -96,5 +112,6 @@ st.metric("Premium", f"£{premium_value:,.2f}")
 
 if metal == "Silver":
     st.metric("VAT (20%)", f"£{vat_value:,.2f}")
+
 
 st.metric("Final Retail Price", f"£{final_price:,.2f}")
