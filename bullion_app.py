@@ -9,13 +9,15 @@ def get_live_spot_prices():
         r.raise_for_status()
         data = r.json()
 
-        prices = {item["metal"]: item["price"] for item in data}
+        # data format: [["gold", price], ["silver", price]]
+        prices = {item[0]: item[1] for item in data}
 
         gold = prices.get("gold")
         silver = prices.get("silver")
 
         return gold, silver
-    except Exception:
+    except Exception as e:
+        st.error(f"Live spot error: {e}")
         return None, None
         
 # -------- PASSWORD PROTECTION (USING SECRETS) --------
@@ -149,5 +151,6 @@ if metal == "Silver":
 
 
 st.metric("Final Retail Price", f"£{final_price:,.2f}")
+
 
 
