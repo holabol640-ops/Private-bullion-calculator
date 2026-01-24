@@ -1,5 +1,23 @@
 import streamlit as st
+import requests
 
+@st.cache_data(ttl=300)  # 5-minute cache
+def get_live_spot_prices():
+    try:
+        url = "https://api.metals.live/v1/spot"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+
+        prices = {item["metal"]: item["price"] for item in data}
+
+        gold = prices.get("gold")
+        silver = prices.get("silver")
+
+        return gold, silver
+    except Exception:
+        return None, None
+        
 # -------- PASSWORD PROTECTION (USING SECRETS) --------
 def check_password():
     if "authenticated" not in st.session_state:
@@ -71,10 +89,26 @@ else:
     weight_label = f"{weight_g / 1000:.3f} kg" if weight_g >= 1000 else f"{weight_g} g"
 
 # ---------------- INPUTS (SMOOTH) ----------------
-spot_per_oz = st.text_input(
-    "Spot price (£ per oz)",
-    value=""
-)
+# ---------------- SPOT PRICE ----------------
+
+st.subheader("Spot price")
+
+use_live = st.checkbox("Use live spot price", value=True)
+
+gold_spot, silver_spot = get_live_spot_prices()
+
+live_spot = gold_spot if metal == "Gold" else silver_spot
+
+if use_live and live_spot:
+    spot_per_oz = float(live_spot)
+    st.success(f"Live {metal} spot: £{spot_per_oz:,.2f} per oz")
+else:
+    spot_per_oz = st.number_input(
+        "Spot price (£ per oz)",
+        min_value=0.0,
+        step=0.01,
+        format="%.2f"
+    )
 
 premium_pct = st.slider(
     "Premium (%)",
@@ -115,4 +149,5 @@ if metal == "Silver":
 
 
 st.metric("Final Retail Price", f"£{final_price:,.2f}")
+
 
