@@ -13,7 +13,11 @@ def check_password():
         st.session_state.authenticated = False
 
     if not st.session_state.authenticated:
-        pwd = st.text_input("Password", type="password")
+        st.markdown("<br><br><br>", unsafe_allow_html=True)  # push down for mobile
+        with st.container():
+            st.subheader("🔒 Login")
+            pwd = st.text_input("Password", type="password")
+
         if pwd and pwd == st.secrets["APP_PASSWORD"]:
             st.session_state.authenticated = True
             st.rerun()
@@ -26,11 +30,11 @@ check_password()
 TROY_OZ_IN_G = 31.1035
 
 # ---------------- SESSION DEFAULTS ----------------
-if "spot_gold" not in st.session_state:
-    st.session_state.spot_gold = 0.0
+if "spot_gold_oz" not in st.session_state:
+    st.session_state.spot_gold_oz = 0.0
 
-if "spot_silver" not in st.session_state:
-    st.session_state.spot_silver = 0.0
+if "spot_silver_oz" not in st.session_state:
+    st.session_state.spot_silver_oz = 0.0
 
 if "premium_pct" not in st.session_state:
     st.session_state.premium_pct = 5.0
@@ -77,29 +81,52 @@ else:
     weight_oz = weight_g / TROY_OZ_IN_G
     weight_label = f"{weight_g / 1000:.3f} kg" if weight_g >= 1000 else f"{weight_g} g"
 
-# ---------------- SPOT PRICE (MANUAL / SAVED) ----------------
+# ---------------- SPOT PRICE ----------------
 st.subheader("Spot price")
 
-spot_value = st.number_input(
-    "Spot price (£ per oz)",
+spot_unit = st.selectbox(
+    "Spot unit",
+    ["£ / oz", "£ / gram", "£ / kg"]
+)
+
+saved_spot_oz = (
+    st.session_state.spot_gold_oz
+    if metal == "Gold"
+    else st.session_state.spot_silver_oz
+)
+
+# Convert saved spot to display unit
+if spot_unit == "£ / oz":
+    spot_display = saved_spot_oz
+elif spot_unit == "£ / gram":
+    spot_display = saved_spot_oz / TROY_OZ_IN_G
+else:
+    spot_display = (saved_spot_oz / TROY_OZ_IN_G) * 1000
+
+spot_input = st.number_input(
+    "Spot price",
     min_value=0.0,
     step=0.01,
-    value=(
-        st.session_state.spot_gold
-        if metal == "Gold"
-        else st.session_state.spot_silver
-    ),
+    value=spot_display,
     format="%.2f"
 )
+
+# Convert back to £/oz
+if spot_unit == "£ / oz":
+    spot_per_oz = spot_input
+elif spot_unit == "£ / gram":
+    spot_per_oz = spot_input * TROY_OZ_IN_G
+else:
+    spot_per_oz = (spot_input / 1000) * TROY_OZ_IN_G
 
 col1, col2 = st.columns(2)
 
 if col1.button("Save Gold spot"):
-    st.session_state.spot_gold = spot_value
+    st.session_state.spot_gold_oz = spot_per_oz
     st.success("Gold spot saved")
 
 if col2.button("Save Silver spot"):
-    st.session_state.spot_silver = spot_value
+    st.session_state.spot_silver_oz = spot_per_oz
     st.success("Silver spot saved")
 
 st.caption("Source: Kitco / LBMA (manual reference)")
@@ -117,9 +144,9 @@ st.session_state.premium_pct = premium_pct
 
 # ---------------- CALCULATIONS ----------------
 spot_per_oz = (
-    st.session_state.spot_gold
+    st.session_state.spot_gold_oz
     if metal == "Gold"
-    else st.session_state.spot_silver
+    else st.session_state.spot_silver_oz
 )
 
 spot_total = spot_per_oz * weight_oz
@@ -144,6 +171,7 @@ if metal == "Silver":
     st.metric("VAT (20%)", f"£{vat_value:,.2f}")
 
 st.metric("Final Retail Price", f"£{final_price:,.2f}")
+
 
 
 
