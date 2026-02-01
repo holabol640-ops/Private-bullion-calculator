@@ -60,20 +60,28 @@ elif product_type == "Silver Coin (1 oz)":
 else:
     metal = "Gold" if "Gold" in product_type else "Silver"
 
-    # Simplified weight selection
-    weight_unit = st.selectbox("Weight unit", ["grams", "kilograms", "oz", "tola"])
-
-    if weight_unit == "grams":
-        weight_g = st.number_input("Weight (grams)", min_value=0.0, step=0.01)
-    elif weight_unit == "kilograms":
-        weight_g = st.number_input("Weight (kg)", min_value=0.0, step=0.01) * 1000
-    elif weight_unit == "oz":
-        weight_oz = st.number_input("Weight (oz)", min_value=0.0, step=0.0001)
-        weight_g = weight_oz * TROY_OZ_IN_G
-    else:  # tola
-        tolas = st.number_input("Number of tolas", min_value=0.0, step=0.01)
-        weight_g = tolas * TOLA_IN_G
-
+    # Weight input in different units
+    weight_unit = st.selectbox(
+        "Weight unit",
+        ["Grams (g)", "Kilograms (kg)", "Troy Ounces (oz)", "Tola"]
+    )
+    
+    weight_value = st.number_input(
+        f"Weight ({weight_unit})",
+        min_value=0.0,
+        step=0.01
+    )
+    
+    # Convert to grams first
+    if weight_unit == "Grams (g)":
+        weight_g = weight_value
+    elif weight_unit == "Kilograms (kg)":
+        weight_g = weight_value * 1000
+    elif weight_unit == "Troy Ounces (oz)":
+        weight_g = weight_value * TROY_OZ_IN_G
+    else:  # Tola
+        weight_g = weight_value * TOLA_IN_G
+    
     weight_oz = weight_g / TROY_OZ_IN_G
     weight_label = f"{weight_g:.2f} g"
 
@@ -92,14 +100,15 @@ if spot_unit == "£ / oz":
     spot_display = saved_spot_oz
 elif spot_unit == "£ / gram":
     spot_display = saved_spot_oz / TROY_OZ_IN_G
-else:  # £ / kg
+else:
     spot_display = (saved_spot_oz / TROY_OZ_IN_G) * 1000
 
 spot_input = st.number_input(
     "Spot price",
     min_value=0.0,
     step=0.01,
-    value=spot_display
+    value=spot_display,
+    key=f"spot_{metal.lower()}"
 )
 
 if spot_unit == "£ / oz":
@@ -108,6 +117,12 @@ elif spot_unit == "£ / gram":
     spot_per_oz = spot_input * TROY_OZ_IN_G
 else:
     spot_per_oz = (spot_input / 1000) * TROY_OZ_IN_G
+
+# Automatically save spot price when changed
+if metal == "Gold":
+    st.session_state.spot_gold_oz = spot_per_oz
+else:
+    st.session_state.spot_silver_oz = spot_per_oz
 
 # ---------------- PREMIUM ----------------
 st.subheader("Premium")
